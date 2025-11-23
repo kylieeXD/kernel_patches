@@ -1,15 +1,15 @@
-From 2093b5a11821642574418ddb6bc6f091f498485b Mon Sep 17 00:00:00 2001
+From af25ca9be228eeac162a46a6cc8d837f78ce3e2f Mon Sep 17 00:00:00 2001
 From: kylieeXD <khayloaftck@gmail.com>
-Date: Sun, 23 Nov 2025 02:39:54 +0000
+Date: Sun, 23 Nov 2025 03:06:50 +0000
 Subject: [PATCH] Implement: Scope-minimized manual hook v1.6 and SuSFS v2.0.0
 
-Change-Id: I0481f3df56f9c3cfd1af344ebce6a21edc0dbf68
+Change-Id: Id17508f361c2544996e70f0633b62962c83cea8a
 ---
  .gitignore                |    2 +
  drivers/input/input.c     |   21 +
  fs/Makefile               |    2 +
  fs/devpts/inode.c         |   15 +
- fs/exec.c                 |   33 +
+ fs/exec.c                 |   37 ++
  fs/namei.c                |  344 ++++++++++
  fs/namespace.c            |  266 ++++++++
  fs/notify/fdinfo.c        |   53 ++
@@ -31,7 +31,7 @@ Change-Id: I0481f3df56f9c3cfd1af344ebce6a21edc0dbf68
  kernel/reboot.c           |   17 +
  kernel/sys.c              |   15 +
  security/selinux/avc.c    |   19 +-
- 26 files changed, 3021 insertions(+), 1 deletion(-)
+ 26 files changed, 3025 insertions(+), 1 deletion(-)
  create mode 100644 fs/susfs.c
  create mode 100644 include/linux/susfs.h
  create mode 100644 include/linux/susfs_def.h
@@ -154,7 +154,7 @@ index 299c295a2..d27b3d4e7 100644
  		return NULL;
  	return dentry->d_fsdata;
 diff --git a/fs/exec.c b/fs/exec.c
-index 652721382..cdcc93618 100644
+index 652721382..59f4bd7c5 100644
 --- a/fs/exec.c
 +++ b/fs/exec.c
 @@ -67,6 +67,9 @@
@@ -205,22 +205,26 @@ index 652721382..cdcc93618 100644
  	/*
  	 * We move the actual failure in case of RLIMIT_NPROC excess from
  	 * set*uid() to execve() because too many poorly written programs
-@@ -2127,6 +2154,9 @@ SYSCALL_DEFINE3(execve,
+@@ -2127,6 +2154,11 @@ SYSCALL_DEFINE3(execve,
  		const char __user *const __user *, argv,
  		const char __user *const __user *, envp)
  {
 +#if defined(CONFIG_KSU) && defined(CONFIG_KSU_MANUAL_HOOK)
-+	ksu_handle_execveat((int *)AT_FDCWD, &filename, &argv, &envp, 0);
++	struct filename *fn = getname(filename);
++	ksu_handle_execveat((int *)AT_FDCWD, &fn, &argv, &envp, 0);
++	putname(fn);
 +#endif
  	return do_execve(getname(filename), argv, envp);
  }
  
-@@ -2146,6 +2176,9 @@ COMPAT_SYSCALL_DEFINE3(execve, const char __user *, filename,
+@@ -2146,6 +2178,11 @@ COMPAT_SYSCALL_DEFINE3(execve, const char __user *, filename,
  	const compat_uptr_t __user *, argv,
  	const compat_uptr_t __user *, envp)
  {
 +#if defined(CONFIG_KSU) && defined(CONFIG_KSU_MANUAL_HOOK) // 32-bit ksud and 32-on-64 support
-+	ksu_handle_execveat((int *)AT_FDCWD, &filename, &argv, &envp, 0);
++	struct filename *fn = getname(filename);
++	ksu_handle_execveat((int *)AT_FDCWD, &fn, &argv, &envp, 0);
++	putname(fn);
 +#endif
  	return compat_do_execve(getname(filename), argv, envp);
  }
